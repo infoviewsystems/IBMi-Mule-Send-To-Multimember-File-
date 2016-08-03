@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ftp="http://www.mulesoft.org/schema/mule/ftp" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as400="http://www.mulesoft.org/schema/mule/as400" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as400 http://www.mulesoft.org/schema/mule/as400/current/mule-as400.xsd
+http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/ee/ftp/current/mule-ftp-ee.xsd
+http://www.mulesoft.org/schema/mule/ftp http://www.mulesoft.org/schema/mule/ftp/current/mule-ftp.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"></http:listener-config>
+    <as400:config name="AS400__AS400_Connector_Configuration" endpoint="${endpoint}" userid="${userid}" password="${password}" doc:name="AS400: AS400 Connector Configuration" libraryList="${libl}"></as400:config>
+    <ftp:connector name="FTP" pollingFrequency="1000" streaming="true" validateConnections="true" doc:name="FTP"></ftp:connector>
+    <flow name="ibmiftpFlow"> 
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/sendFile" doc:name="HTTP"></http:listener>  
+        <logger level="INFO" doc:name="Logger"></logger>  
+        <flow-ref name="CreateAS400Member" doc:name="CreateAS400Member"></flow-ref>  
+        <set-payload value="#[message.inboundAttachments.'file2member'.dataSource.content]" doc:name="Get Attachment"></set-payload>  
+        <ftp:outbound-endpoint host="${endpoint}" port="21" path="QSYS.LIB/${targetFileLib}.LIB/${targetFile}.FILE" user="${userid}" password="${password}" binary="false" outputPattern="#[message.inboundProperties.'http.query.params'.memberName + &quot;.MBR&quot;]" responseTimeout="10000" doc:name="FTP to AS400"></ftp:outbound-endpoint>  
+        <logger message="Sent data successfully" level="INFO" doc:name="Log data transfer DONE"></logger>  
+        <as400:command-call config-ref="AS400__AS400_Connector_Configuration" cmd="#[&quot;CALL ${programLib}/${programName} PARM(&quot; + message.inboundProperties.'http.query.params'.memberName + &quot;)&quot;]" doc:name="Call AS400 program"></as400:command-call>
+        <logger message="Call completed normally" level="INFO" doc:name="Call completed normally"/>  
+    </flow>
+    <flow name="CreateAS400Member"> 
+        <as400:command-call config-ref="AS400__AS400_Connector_Configuration" cmd="#[&quot;ADDPFM FILE(${targetFileLib}/${targetFile}) MBR(&quot; + message.inboundProperties.'http.query.params'.memberName + &quot;)&quot;]" doc:name="Create AS400 File Member"></as400:command-call>  
+        <catch-exception-strategy doc:name="Catch Exception Strategy"> 
+            <logger message="#[&quot;Error adding member &quot; + message.exception]" level="INFO" doc:name="Logger"></logger>  
+        </catch-exception-strategy>  
+    </flow>
+</mule>
