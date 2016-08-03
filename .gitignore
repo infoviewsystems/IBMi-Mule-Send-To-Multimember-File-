@@ -1,0 +1,5 @@
+target/classes/ibmiftp.xml
+target/classes/log4j2.xml
+target/classes/mule-app.properties
+target/classes/mule-deploy.properties
+target/test-classes/log4j2-test.xml
